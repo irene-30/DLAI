@@ -77,3 +77,40 @@ class Decoder(nn.Module):
         x = self.activation(self.conv2(x))
         x = torch.sigmoid(self.conv1(x)) # last layer before output is sigmoid, since we are using BCE as reconstruction loss
         return x
+
+
+class VariationalAutoencoder(nn.Module):
+    def __init__(self, hidden_channels: int, latent_dim: int):
+        super().__init__()
+        self.encoder = Encoder(hidden_channels=hidden_channels,
+                               latent_dim=latent_dim)
+        self.decoder = Decoder(hidden_channels=hidden_channels,
+                               latent_dim=latent_dim)
+
+    def forward(self, x):
+        latent_mu, latent_logvar = self.encoder(x)
+        latent = self.latent_sample(latent_mu, latent_logvar)
+        x_recon = self.decoder(latent)
+        return x_recon, latent_mu, latent_logvar
+
+    def latent_sample(self, mu, logvar):
+
+        if self.training:
+            # Convert the logvar to std
+            std = (logvar * 0.5).exp()
+
+            # the reparameterization trick
+            return torch.distributions.Normal(loc=mu, scale=std).rsample()
+
+            # Or if you prefer to do it without a torch.distribution...
+            # std = logvar.mul(0.5).exp_()
+            # eps = torch.empty_like(std).normal_()
+            # return eps.mul(std).add_(mu)
+        else:
+            return mu
+
+vae = VariationalAutoencoder(hidden_channels=capacity, latent_dim=latent_dims)
+vae = vae.to(device)
+
+num_params = sum(p.numel() for p in vae.parameters() if p.requires_grad)
+print('Number of parameters: %d' % num_params)
