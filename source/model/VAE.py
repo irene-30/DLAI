@@ -1,116 +1,128 @@
-class Encoder(nn.Module):
-    def __init__(self, hidden_channels: int, latent_dim: int) -> None:
-        """
-        Simple encoder module
+"""
+Defines the VQ-VAE model (Stage 1) for learning discrete text representations.
+This is a Transformer Encoder/Decoder with a VQ bottleneck.
+"""
 
-        It predicts the `mean` and `log(variance)` parameters.
+import torch
+import torch.nn as nn
+from src.model.modules import VectorQuantizer # Import from modules.py
 
-        The choice to use the `log(variance)` is explained below.
-        """
+class VQVAEModel(nn.Module):
+    """
+    Transformer-based VQ-VAE Autoencoder.
+    Implements the f_enc and f_dec described in the paper.
+    
+    Args:
+        vocab_size (int): Size of the text tokenizer vocabulary.
+        d_model (int): Internal dimension of the model.
+        n_head (int): Number of attention heads.
+        num_encoder_layers (int): Number of Transformer encoder layers.
+        num_decoder_layers (int): Number of Transformer decoder layers.
+        dim_feedforward (int): Hidden dim of feedforward networks.
+        num_embeddings (int): Codebook size (K).
+        commitment_cost (float): Beta for VQ loss.
+        max_seq_len (int): Max sequence length for positional embeddings.
+    """
+    def __init__(self, 
+                 vocab_size: int, 
+                 d_model: int = 256, 
+                 n_head: int = 4, 
+                 num_encoder_layers: int = 2, 
+                 num_decoder_layers: int = 2,
+                 dim_feedforward: int = 1024,
+                 num_embeddings: int = 1024, 
+                 commitment_cost: float = 0.25,
+                 max_seq_len: int = 512):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels=1,
-                               out_channels=hidden_channels,
-                               kernel_size=4,
-                               stride=2,
-                               padding=1) # out: hidden_channels x 14 x 14
+        
+        self.token_emb = nn.Embedding(vocab_size, d_model)
+        self.pos_emb = nn.Parameter(torch.zeros(1, max_seq_len, d_model))
+        self.d_model = d_model
 
-        self.conv2 = nn.Conv2d(in_channels=hidden_channels,
-                               out_channels=hidden_channels*2,
-                               kernel_size=4,
-                               stride=2,
-                               padding=1) # out: (hidden_channels x 2) x 7 x 7
+        # f_enc (Transformer Encoder)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model, nhead=n_head, dim_feedforward=dim_feedforward, batch_first=True
+        )
+        self.transformer_encoder = nn.TransformerEncoder(
+            encoder_layer, num_layers=num_encoder_layers
+        )
+        
+        # VQ Bottleneck
+        self.quantizer = VectorQuantizer(num_embeddings, d_model, commitment_cost)
+        
+        # f_dec (Transformer Decoder)
+        decoder_layer = nn.TransformerDecoderLayer(
+            d_model=d_model, nhead=n_head, dim_feedforward=dim_feedforward, batch_first=True
+        )
+        self.transformer_decoder = nn.TransformerDecoder(
+            decoder_layer, num_layers=num_decoder_layers
+        )
+        
+        # Output layer to map back to vocabulary
+        self.to_logits = nn.Linear(d_model, vocab_size)
 
-        self.fc_mu = nn.Linear(in_features=hidden_channels*2*7*7,
-                               out_features=latent_dim)
-        self.fc_logvar = nn.Linear(in_features=hidden_channels*2*7*7,
-                                   out_features=latent_dim)
+    def encode(self, src_tokens: torch.Tensor):
+        """Encodes text tokens into quantized vectors and indices."""
+        # src_tokens shape: (B, T)
+        B, T = src_tokens.shape
+        
+        # (B, T) -> (B, T, D)
+        x = self.token_emb(src_tokens) * (self.d_model**0.5)
+        x = x + self.pos_emb[:, :T, :]
+        
+        # (B, T, D) -> (B, T, D)
+        encoded = self.transformer_encoder(x)
+        
+        # (B, T, D) -> (B, T, D), loss, (B, T)
+        quantized, vq_loss, indices = self.quantizer(encoded)
+        return quantized, vq_loss, indices
 
-        self.activation = nn.ReLU()
+    def decode(self, quantized_memory: torch.Tensor, tgt_tokens: torch.Tensor):
+        """Decodes quantized vectors back into text logits."""
+        # tgt_tokens shape: (B, T)
+        B, T = tgt_tokens.shape
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        :param x: batch of images with shape [batch, channels, w, h]
-        :returns: the predicted mean and log(variance)
-        """
-        x = self.activation(self.conv1(x))
-        x = self.activation(self.conv2(x))
+        # Create decoder input embeddings
+        tgt_emb = self.token_emb(tgt_tokens) * (self.d_model**0.5)
+        tgt_emb = tgt_emb + self.pos_emb[:, :T, :]
+        
+        # Create a causal mask for the decoder
+        tgt_mask = nn.Transformer.generate_square_subsequent_mask(T).to(tgt_emb.device)
 
-        x = x.view(x.shape[0], -1)
+        # Decode
+        decoded = self.transformer_decoder(
+            tgt=tgt_emb, 
+            memory=quantized_memory, 
+            tgt_mask=tgt_mask
+        )
+        
+        # (B, T, D) -> (B, T, VocabSize)
+        logits = self.to_logits(decoded)
+        return logits
 
-        x_mu = self.fc_mu(x)
-        x_logvar = self.fc_logvar(x)
-
-        return x_mu, x_logvar
-
-class Decoder(nn.Module):
-    def __init__(self, hidden_channels: int, latent_dim: int) -> None:
-        """
-        Simple decoder module
-        """
-        super().__init__()
-        self.hidden_channels = hidden_channels
-
-        self.fc = nn.Linear(in_features=latent_dim,
-                            out_features=hidden_channels*2*7*7)
-
-        self.conv2 = nn.ConvTranspose2d(in_channels=hidden_channels*2,
-                                        out_channels=hidden_channels,
-                                        kernel_size=4,
-                                        stride=2,
-                                        padding=1)
-        self.conv1 = nn.ConvTranspose2d(in_channels=hidden_channels,
-                                        out_channels=1,
-                                        kernel_size=4,
-                                        stride=2,
-                                        padding=1)
-
-        self.activation = nn.ReLU()
-
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        :param x: a sample from the distribution governed by the mean and log(var)
-        :returns: a reconstructed image with size [batch, 1, w, h]
-        """
-        x = self.fc(x)
-        x = x.view(x.size(0), self.hidden_channels*2, 7, 7)
-        x = self.activation(self.conv2(x))
-        x = torch.sigmoid(self.conv1(x)) # last layer before output is sigmoid, since we are using BCE as reconstruction loss
-        return x
-
-
-class VariationalAutoencoder(nn.Module):
-    def __init__(self, hidden_channels: int, latent_dim: int):
-        super().__init__()
-        self.encoder = Encoder(hidden_channels=hidden_channels,
-                               latent_dim=latent_dim)
-        self.decoder = Decoder(hidden_channels=hidden_channels,
-                               latent_dim=latent_dim)
-
-    def forward(self, x):
-        latent_mu, latent_logvar = self.encoder(x)
-        latent = self.latent_sample(latent_mu, latent_logvar)
-        x_recon = self.decoder(latent)
-        return x_recon, latent_mu, latent_logvar
-
-    def latent_sample(self, mu, logvar):
-
-        if self.training:
-            # Convert the logvar to std
-            std = (logvar * 0.5).exp()
-
-            # the reparameterization trick
-            return torch.distributions.Normal(loc=mu, scale=std).rsample()
-
-            # Or if you prefer to do it without a torch.distribution...
-            # std = logvar.mul(0.5).exp_()
-            # eps = torch.empty_like(std).normal_()
-            # return eps.mul(std).add_(mu)
-        else:
-            return mu
-
-vae = VariationalAutoencoder(hidden_channels=capacity, latent_dim=latent_dims)
-vae = vae.to(device)
-
-num_params = sum(p.numel() for p in vae.parameters() if p.requires_grad)
-print('Number of parameters: %d' % num_params)
+    def forward(self, src_tokens: torch.Tensor):
+        """Full autoencoding pass."""
+        # src_tokens shape: (B, T)
+        
+        # Encode
+        quantized, vq_loss, _ = self.encode(src_tokens)
+        
+        # Decode
+        # We use src_tokens as the "target" for the decoder in an autoencoder setup
+        logits = self.decode(quantized_memory=quantized, tgt_tokens=src_tokens)
+        
+        # Calculate Reconstruction Loss (Cross-Entropy)
+        # We want the decoder to predict the *next* token, so we shift
+        shift_logits = logits[:, :-1, :].contiguous()
+        shift_labels = src_tokens[:, 1:].contiguous()
+        
+        loss_fn = nn.CrossEntropyLoss()
+        recon_loss = loss_fn(
+            shift_logits.view(-1, shift_logits.size(-1)), 
+            shift_labels.view(-1)
+        )
+        
+        # Total loss = Reconstruction Loss + VQ Loss
+        total_loss = recon_loss + vq_loss
+        
+        return total_loss, recon_loss, vq_loss
