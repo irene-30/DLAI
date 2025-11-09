@@ -22,7 +22,7 @@ LATENT_TOKENS = [f"<latent_{i}>" for i in range(VQ_CODEBOOK_SIZE)]
 
 # --- Path Definitions ---
 # These paths are relative to the repository root
-PATH_VQVAE_MODEL = "drive/MyDrive/DLAI/experiments/vqvae_stage1.pth"
+PATH_VQVAE_MODEL = "/content/drive/My Drive/DLAI/experiments/vqvae_stage1.pth"
 PATH_LLM_MODEL = "experiments/llm_stage2"
 PATH_RAW_DATA = "data/raw/gsm8k_train.jsonl" # Assumes you downloaded it
 PATH_PROCESSED_DATA = "data/processed/assorted_train.jsonl"
