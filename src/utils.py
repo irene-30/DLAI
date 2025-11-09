@@ -103,7 +103,7 @@ def create_assorted_dataset(
         if not parsed:
             continue
             
-        prompt, cot, solution = parsed["prompt"], parsed["cot"], parsed["solution"]
+        prompt, cot, solution = parsed[0], parsed[1], parsed[2]
 
         # --- 1. Get Latent Tokens for the CoT (C) ---
         cot_tokens_dict = llm_tokenizer(
