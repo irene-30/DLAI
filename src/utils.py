@@ -72,6 +72,7 @@ def create_assorted_dataset(
     vq_model: VQVAEModel, 
     llm_tokenizer: PreTrainedTokenizer, 
     dataset: HFDataset,
+    device: torch.device,
     compression_rate: int = 16, # As per paper
     max_latent_tokens: int = 256 # As per paper (randomized max)
 ) -> List[Dict[str, str]]:
@@ -119,7 +120,7 @@ def create_assorted_dataset(
             continue
         
         with torch.no_grad():
-            _, _, indices = vq_model.encode(cot_tokens.to(vq_model.device))
+            _, _, indices = vq_model.encode(cot_tokens.to(device))
         
         indices = indices.squeeze(0) # Shape (T_cot,)
 
