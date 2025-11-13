@@ -31,7 +31,7 @@ class VQVAEModel(nn.Module):
                  num_decoder_layers: int = 2,
                  dim_feedforward: int = 1024,
                  num_embeddings: int = 1024, 
-                 commitment_cost: float = 0.1,
+                 commitment_cost: float = 0.05,
                  max_seq_len: int = 512):
         super().__init__()
         
