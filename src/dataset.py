@@ -61,6 +61,8 @@ class AssortedDataset(Dataset):
     This also uses a lazy-loading approach.
     """
     def __init__(self, tokenizer: PreTrainedTokenizer, file_path: str, max_length: int):
+        self.tokenizer = tokenizer
+        self.max_length = max_length
         self.data = load_dataset("json", data_files=file_path, split="train")
 
     def __len__(self):
