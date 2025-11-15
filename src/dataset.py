@@ -61,10 +61,6 @@ class AssortedDataset(Dataset):
     This also uses a lazy-loading approach.
     """
     def __init__(self, tokenizer: PreTrainedTokenizer, file_path: str, max_length: int):
-        self.tokenizer = tokenizer
-        self.max_length = max_length
-        print(f"Loading assorted dataset from {file_path}...")
-        # This `load_dataset` function is memory-mapped and very efficient.
         self.data = load_dataset("json", data_files=file_path, split="train")
 
     def __len__(self):
@@ -78,7 +74,16 @@ class AssortedDataset(Dataset):
             max_length=self.max_length,
             padding="max_length",
             truncation=True,
+            return_tensors="pt"  # <-- 1. ADD THIS to return PyTorch Tensors
         )
         
-        tokenized["labels"] = tokenized["input_ids"].copy()
-        return tokenized
+        # 2. Use .clone() for labels
+        tokenized["labels"] = tokenized["input_ids"].clone() 
+        
+        # 3. Squeeze all tensors to remove the batch dim (size [1, T] -> [T])
+        # The DataLoader will re-add the batch dimension later.
+        return {
+            "input_ids": tokenized["input_ids"].squeeze(0),
+            "attention_mask": tokenized["attention_mask"].squeeze(0),
+            "labels": tokenized["labels"].squeeze(0)
+        }
