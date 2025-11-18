@@ -28,7 +28,7 @@ class Lazy_VQVAE_Dataset(Dataset):
                 continue
             
             # Store the raw text, not the tokenized tensor
-            full_text = parsed[0] + parsed[1] + parsed[2]
+            full_text = parsed['prompt'] + parsed['cot'] + parsed['solution']
             self.samples.append(full_text)
 
     def __len__(self):
