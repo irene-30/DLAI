@@ -59,7 +59,7 @@ def parse_gsm8k_sample(sample: Dict) -> Optional[Tuple[str, str, str]]:
     cot = cot_text
     solution = f" #### {final_answer_str}"
     
-    return prompt, cot, solution
+    return {'prompt': prompt, 'cot':  cot, 'solution': solution}
 
 def extract_final_answer(text: str) -> Optional[str]:
     """Extracts the final numerical answer from a generated string."""
