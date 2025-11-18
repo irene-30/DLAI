@@ -14,7 +14,7 @@ from src.model.vae import VQVAEModel # Import for type hinting and usage
 # --- Constants ---
 LLM_MODEL_NAME = "gpt2"
 VQ_CODEBOOK_SIZE = 1024
-MAX_SEQ_LEN = 1024
+MAX_SEQ_LEN = 512
 
 # --- Token Definitions ---
 SPECIAL_TOKENS = ["[PAD]", "[boLatent]", "[eoLatent]"]
