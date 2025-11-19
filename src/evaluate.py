@@ -67,6 +67,7 @@ def evaluate_model(model_path: str = PATH_LLM_MODEL):
         if pred_answer is not None and pred_answer == true_answer:
             correct += 1
         total += 1
+        print(total)
 
     # 5. Report accuracy
     accuracy = (correct / total) * 100
