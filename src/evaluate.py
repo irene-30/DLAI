@@ -33,7 +33,7 @@ def evaluate_model(model_path: str = PATH_LLM_MODEL):
 
     # 2. Load test data
     test_data = load_dataset("gsm8k", "main")['test']
-    
+    print(len(test_data))
     correct = 0
     total = 0
     
