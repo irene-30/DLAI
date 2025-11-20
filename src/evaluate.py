@@ -70,6 +70,7 @@ def evaluate_model(model_path: str = PATH_LLM_MODEL):
         print(total)
 
     # 5. Report accuracy
+    print(total)
     accuracy = (correct / total) * 100
     print("\n--- 📈 Evaluation Results ---")
     print(f"Correct: {correct}")
