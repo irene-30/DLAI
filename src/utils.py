@@ -17,7 +17,7 @@ from src.model.quantizer_posthoc import PostHocRBFQuantizer
 # --- Constants ---
 LLM_MODEL_NAME = "gpt2"
 VQ_CODEBOOK_SIZE = 1024
-MAX_SEQ_LEN = 512
+MAX_SEQ_LEN = 1024
 
 # --- Token Definitions ---
 SPECIAL_TOKENS = ["[PAD]", "[boLatent]", "[eoLatent]"]
