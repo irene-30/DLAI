@@ -10,6 +10,9 @@ import torch
 from datasets import Dataset as HFDataset
 from transformers import AutoTokenizer, PreTrainedTokenizer
 from src.model.vae import VQVAEModel # Import for type hinting and usage
+# Import models for type hinting
+from src.model.vae_continuous import ContinuousVAE
+from src.model.quantizer_posthoc import PostHocRBFQuantizer
 
 # --- Constants ---
 LLM_MODEL_NAME = "gpt2"
@@ -26,6 +29,7 @@ PATH_VQVAE_MODEL = "/content/drive/My Drive/DLAI/experiments/vqvae_stage1.pth"  
 PATH_LLM_MODEL = "/content/drive/My Drive/DLAI/experiments/llm_stage2"     # "experiments/llm_stage2"
 PATH_RAW_DATA = "data/raw/gsm8k_train.jsonl" # Assumes you downloaded it
 PATH_PROCESSED_DATA = "/content/drive/My Drive/DLAI/data/processed/assorted_train.jsonl"   # "data/processed/assorted_train.jsonl"
+# PATH_PROCESSED_DATA_RBF = "/content/drive/My Drive/DLAI/data/processed/assorted_train_rbf.jsonl"
 
 
 def get_llm_tokenizer() -> PreTrainedTokenizer:
@@ -104,7 +108,7 @@ def create_assorted_dataset(
         if not parsed:
             continue
             
-        prompt, cot, solution = parsed[0], parsed[1], parsed[2]
+        prompt, cot, solution = parsed['prompt'], parsed['cot'], parsed['solution']
 
         # --- 1. Get Latent Tokens for the CoT (C) ---
         cot_tokens_dict = llm_tokenizer(
@@ -169,5 +173,70 @@ def create_assorted_dataset(
         # --- 3. Create the final training string (P + C_assorted + S) ---
         final_string = prompt + assorted_cot + solution
         assorted_samples.append({"text": final_string})
+
+    return assorted_samples
+
+def create_assorted_dataset_rbf(
+    vae_model: ContinuousVAE,
+    quantizer_model: PostHocRBFQuantizer,
+    llm_tokenizer: PreTrainedTokenizer,
+    dataset: HFDataset,
+    device: torch.device,
+    compression_rate: int = 16
+) -> List[Dict[str, str]]:
+    """
+    Generates the assorted dataset using the Two-Stage RBF approach.
+    1. VAE encodes to continuous 'z'.
+    2. RBF Quantizer maps 'z' to indices.
+    """
+    print("Creating 'Token Assorted' dataset (RBF Post-Hoc)...")
+    vae_model.eval()
+    # RBF Quantizer does not have batch norm/dropout, but good practice
+    quantizer_model.eval() 
+    
+    assorted_samples = []
+    boLatent, eoLatent = SPECIAL_TOKENS[1], SPECIAL_TOKENS[2]
+
+    for sample in tqdm(dataset):
+        parsed = parse_gsm8k_sample(sample)
+        if not parsed: continue
+        prompt, cot, solution = parsed['prompt'], parsed['cot'], parsed['solution']
+
+        cot_tokens = llm_tokenizer(cot, add_special_tokens=False, return_tensors="pt", max_length=MAX_SEQ_LEN, truncation=True)['input_ids']
+        if cot_tokens.shape[1] == 0: continue
+        
+        input_ids = cot_tokens.to(device)
+        
+        with torch.no_grad():
+            # Step 1: Get continuous latent z (using mean)
+            # ContinuousVAE.encode returns (z, mu, logvar)
+            _, z_mu, _ = vae_model.encode(input_ids)
+            
+            # Step 2: Map continuous z to discrete indices using RBF
+            indices = quantizer_model.get_indices(z_mu)
+        
+        indices = indices.squeeze(0)
+
+        # --- Randomized Replacement (Same logic as standard) ---
+        m_max = random.choice([0, 72, 128, 160, 192, 224, 256])
+        m = random.choice(range(0, m_max + 1, compression_rate)) if m_max > 0 else 0
+        m = min(m, cot_tokens.shape[1])
+
+        if m > 0:
+            latent_strs = [LATENT_TOKENS[idx.item()] for idx in indices[:m]]
+            # Careful with offset mapping here if tokenizer is fast
+            try:
+                encoding = llm_tokenizer(cot, add_special_tokens=False)
+                split_point = encoding.token_to_chars(m - 1).end
+                remaining_text = cot[split_point:]
+            except:
+                 # Fallback if alignment fails slightly
+                remaining_text = "" 
+            
+            assorted_cot = f"{boLatent} {' '.join(latent_strs)} {eoLatent}{remaining_text}"
+        else:
+            assorted_cot = cot
+
+        assorted_samples.append({"text": prompt + assorted_cot + solution})
 
     return assorted_samples
