@@ -40,13 +40,12 @@ def evaluate_model(model_path: str = PATH_LLM_MODEL):
     for sample in tqdm(test_data, desc="Evaluating"):
         parsed = parse_gsm8k_sample(sample)
         if not parsed:
-            print(f"Skipping sample {i}: Failed to extract true answer.")
+            print(f"Skipping sample {i}: Failed to parse.")
             continue
         
         #prompt, _, solution = parsed
-        prompt=parsed['prompt']
-        solution=parsed['solution']
-        
+        prompt = parsed['prompt']
+        solution = parsed['solution']
         
         # Get ground truth answer
         true_answer = extract_final_answer(solution)
