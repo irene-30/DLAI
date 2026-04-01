@@ -10,7 +10,7 @@ class ContinuousVAE(nn.Module):
                  num_encoder_layers: int = 2, 
                  num_decoder_layers: int = 2,
                  dim_feedforward: int = 1024,
-                 max_seq_len: int = 512):
+                 max_seq_len: int = 256):
         super().__init__()
         
         self.d_model = d_model
