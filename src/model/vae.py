@@ -1,27 +1,19 @@
 """
 Defines the VQ-VAE model (Stage 1) for learning discrete text representations.
-This is a Transformer Encoder/Decoder with a VQ bottleneck.
+This model acts as the 'compressor' that maps text hops to latent tokens.
 """
 
 import torch
 import torch.nn as nn
-from src.model.modules import VectorQuantizer # Import from modules.py
+from src.model.modules import VectorQuantizer
 
 class VQVAEModel(nn.Module):
     """
-    Transformer-based VQ-VAE Autoencoder.
-    Implements the f_enc and f_dec described in the paper.
+    Transformer-based VQ-VAE Autoencoder for logical reasoning hops.
     
-    Args:
-        vocab_size (int): Size of the text tokenizer vocabulary.
-        d_model (int): Internal dimension of the model.
-        n_head (int): Number of attention heads.
-        num_encoder_layers (int): Number of Transformer encoder layers.
-        num_decoder_layers (int): Number of Transformer decoder layers.
-        dim_feedforward (int): Hidden dim of feedforward networks.
-        num_embeddings (int): Codebook size (K).
-        commitment_cost (float): Beta for VQ loss.
-        max_seq_len (int): Max sequence length for positional embeddings.
+    The Encoder (f_enc) maps a text hop into a continuous latent space,
+    which is then quantized by the codebook. The Decoder (f_dec) attempts 
+    to reconstruct the original text hop from that quantized vector.
     """
     def __init__(self, 
                  vocab_size: int, 
@@ -31,15 +23,15 @@ class VQVAEModel(nn.Module):
                  num_decoder_layers: int = 2,
                  dim_feedforward: int = 1024,
                  num_embeddings: int = 1024, 
-                 commitment_cost: float = 0.05,
-                 max_seq_len: int = 512):
+                 commitment_cost: float = 0.25, # Standard beta from VQ-VAE papers
+                 max_seq_len: int = 128): # ProntoQA hops are short
         super().__init__()
         
+        self.d_model = d_model
         self.token_emb = nn.Embedding(vocab_size, d_model)
         self.pos_emb = nn.Parameter(torch.zeros(1, max_seq_len, d_model))
-        self.d_model = d_model
 
-        # f_enc (Transformer Encoder)
+        # f_enc: Maps text tokens to a latent bottleneck
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model, nhead=n_head, dim_feedforward=dim_feedforward, batch_first=True
         )
@@ -47,10 +39,10 @@ class VQVAEModel(nn.Module):
             encoder_layer, num_layers=num_encoder_layers
         )
         
-        # VQ Bottleneck
+        # VQ Bottleneck: The discrete codebook
         self.quantizer = VectorQuantizer(num_embeddings, d_model, commitment_cost)
         
-        # f_dec (Transformer Decoder)
+        # f_dec: Reconstructs text from the quantized latent vector
         decoder_layer = nn.TransformerDecoderLayer(
             d_model=d_model, nhead=n_head, dim_feedforward=dim_feedforward, batch_first=True
         )
@@ -58,61 +50,58 @@ class VQVAEModel(nn.Module):
             decoder_layer, num_layers=num_decoder_layers
         )
         
-        # Output layer to map back to vocabulary
+        # Final output head for reconstruction
         self.to_logits = nn.Linear(d_model, vocab_size)
 
     def encode(self, src_tokens: torch.Tensor):
-        """Encodes text tokens into quantized vectors and indices."""
-        # src_tokens shape: (B, T)
+        """Encodes reasoning hops into quantized vectors and discrete indices."""
         B, T = src_tokens.shape
         
-        # (B, T) -> (B, T, D)
+        # Embedding + Positional Encoding
         x = self.token_emb(src_tokens) * (self.d_model**0.5)
         x = x + self.pos_emb[:, :T, :]
         
-        # (B, T, D) -> (B, T, D)
+        # Transformer pass
         encoded = self.transformer_encoder(x)
         
-        # (B, T, D) -> (B, T, D), loss, (B, T)
+        # Quantization bottleneck
+        # quantized: (B, T, D), vq_loss: scalar, indices: (B, T)
         quantized, vq_loss, indices = self.quantizer(encoded)
         return quantized, vq_loss, indices
 
     def decode(self, quantized_memory: torch.Tensor, tgt_tokens: torch.Tensor):
-        """Decodes quantized vectors back into text logits."""
-        # tgt_tokens shape: (B, T)
+        """Decodes the quantized bottleneck back into text logits."""
         B, T = tgt_tokens.shape
 
-        # Create decoder input embeddings
         tgt_emb = self.token_emb(tgt_tokens) * (self.d_model**0.5)
         tgt_emb = tgt_emb + self.pos_emb[:, :T, :]
         
-        # Create a causal mask for the decoder
+        # Causal mask for the auto-regressive reconstruction
         tgt_mask = nn.Transformer.generate_square_subsequent_mask(T).to(tgt_emb.device)
 
-        # Decode
+        # The 'memory' here is the quantized output of the encoder
         decoded = self.transformer_decoder(
             tgt=tgt_emb, 
             memory=quantized_memory, 
             tgt_mask=tgt_mask
         )
         
-        # (B, T, D) -> (B, T, VocabSize)
-        logits = self.to_logits(decoded)
-        return logits
+        return self.to_logits(decoded)
 
     def forward(self, src_tokens: torch.Tensor):
-        """Full autoencoding pass."""
-        # src_tokens shape: (B, T)
-        
-        # Encode
+        """
+        Calculates the total training loss.
+        loss = Reconstruction (Cross-Entropy) + Quantization (Commitment)
+        """
+        # 1. Encode to the discrete bottleneck
         quantized, vq_loss, _ = self.encode(src_tokens)
         
-        # Decode
-        # We use src_tokens as the "target" for the decoder in an autoencoder setup
+        # 2. Decode to reconstruct original text
+        # We use the src_tokens as target for autoencoding
         logits = self.decode(quantized_memory=quantized, tgt_tokens=src_tokens)
         
-        # Calculate Reconstruction Loss (Cross-Entropy)
-        # We want the decoder to predict the *next* token, so we shift
+        # 3. Calculate Reconstruction Loss (Cross-Entropy)
+        # Shift tokens for next-word prediction logic
         shift_logits = logits[:, :-1, :].contiguous()
         shift_labels = src_tokens[:, 1:].contiguous()
         
@@ -122,7 +111,10 @@ class VQVAEModel(nn.Module):
             shift_labels.view(-1)
         )
         
-        # Total loss = Reconstruction Loss + VQ Loss
         total_loss = recon_loss + vq_loss
         
         return total_loss, recon_loss, vq_loss
+
+    def get_codebook_weights(self):
+        """Returns the learned codebook centroids."""
+        return self.quantizer.embedding.weight.data
