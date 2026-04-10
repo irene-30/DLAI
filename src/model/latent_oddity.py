@@ -110,55 +110,55 @@ class LatentOddityQuantizer(nn.Module):
         
        # return indices
     def update(self, z, logvar, input_ids=None):
-    """
-    Riemannian Update: Cluster using the decoder's functional geometry.
+        """
+        Riemannian Update: Cluster using the decoder's functional geometry.
     
-    Args:
-        z (Tensor): The latent mean (mu) from the encoder [B, T, D].
-        logvar (Tensor): The latent log-variance from the encoder [B, T, D].
-        input_ids (Tensor): Raw tokens needed to re-run the gradient-enabled 
-                           metric calculation [B, T].
-    """
-    # 1. Compute the local metric tensor G(z) 
-    # We pass input_ids to re-run the encoder inside to maintain the grad_fn
+        Args:
+            z (Tensor): The latent mean (mu) from the encoder [B, T, D].
+            logvar (Tensor): The latent log-variance from the encoder [B, T, D].
+            input_ids (Tensor): Raw tokens needed to re-run the gradient-enabled 
+                               metric calculation [B, T].
+        """
+        # 1. Compute the local metric tensor G(z) 
+        # We pass input_ids to re-run the encoder inside to maintain the grad_fn
         G = compute_stochastic_metric(self.vae_model, input_ids)
     
-    # 2. Prepare tensors for Riemannian distance calculation
-    # We subset to T=16 to keep the Jacobian memory footprint small for Colab T4
+        # 2. Prepare tensors for Riemannian distance calculation
+        # We subset to T=16 to keep the Jacobian memory footprint small for Colab T4
         T_sub = G.size(1) 
         z_sub = z[:, :T_sub, :]
     
-    # Flatten Batch and Time for distance matrix operations
-    # z_flat: [B * T_sub, D]
-    # G_flat: [B * T_sub, D, D]
+        # Flatten Batch and Time for distance matrix operations
+        # z_flat: [B * T_sub, D]
+        # G_flat: [B * T_sub, D, D]
         z_flat = z_sub.reshape(-1, self.dim)
         G_flat = G.reshape(-1, self.dim, self.dim)
     
-    # 3. Compute Riemannian distance: d^2 = (z - e)^T G (z - e)
-    # diff: [B*T_sub, num_embeddings, D]
+        # 3. Compute Riemannian distance: d^2 = (z - e)^T G (z - e)
+        # diff: [B*T_sub, num_embeddings, D]
         diff = z_flat.unsqueeze(1) - self.embedding.weight.unsqueeze(0)
     
-    # Riemannian quadratic form: diff^T @ G @ diff
-    # G_diff: [B*T_sub, num_embeddings, D]
+        # Riemannian quadratic form: diff^T @ G @ diff
+        # G_diff: [B*T_sub, num_embeddings, D]
         G_diff = torch.matmul(diff, G_flat.unsqueeze(1)) 
         dist = torch.sum(G_diff * diff, dim=-1) # [B*T_sub, num_embeddings]
     
-    # 4. Find nearest codebook entries
+        # 4. Find nearest codebook entries
         indices = torch.argmin(dist, dim=1)
     
-    # 5. Exponential Moving Average (EMA) Update
-    # Convert indices to one-hot for cluster counting
+        # 5. Exponential Moving Average (EMA) Update
+        # Convert indices to one-hot for cluster counting
         encodings = torch.nn.functional.one_hot(indices, self.num_embeddings).float()
     
-    # Update cluster usage counts
+        # Update cluster usage counts
         self.cluster_size.data.mul_(self.decay).add_(encodings.sum(0), alpha=1 - self.decay)
     
-    # Update centroid weights
-    # ema_w: [num_embeddings, D]
+        # Update centroid weights
+        # ema_w: [num_embeddings, D]
         dw = torch.matmul(encodings.t(), z_flat)
         self.ema_w.data.mul_(self.decay).add_(dw, alpha=1 - self.decay)
     
-    # Laplacian smoothing/Normalization for the embedding weights
+        # Laplacian smoothing/Normalization for the embedding weights
         n = self.cluster_size.sum()
         smoothed_cluster_size = (self.cluster_size + 1e-5) / (n + self.num_embeddings * 1e-5) * n
         self.embedding.weight.data.copy_(self.ema_w / smoothed_cluster_size.unsqueeze(1))
