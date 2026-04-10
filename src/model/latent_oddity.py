@@ -8,13 +8,25 @@ def compute_stochastic_metric_optimized(vae_model, z, logvar, n_samples=10):
     Optimized for Colab: Computes the Metric Tensor G(z) using 
     Vector-Jacobian Products (VJP) to save memory.
     """
+    # 1. Ensure z tracks gradients for the Jacobian calculation
+    # Even if it was detached during encoding, we re-attach it here.
+    z = z.detach().requires_grad_(True) 
+    
     B, T, D = z.shape
-    z = z.detach().requires_grad_(True)
+    T_sub = min(T, 16)
+    
+    # 2. Proceed with the decoder pass
+    logits = vae_model.decode_from_z(z[:, :T_sub, :])
+
+
+    
+    # B, T, D = z.shape
+    #z = z.detach().requires_grad_(True)
     
     # 1. Forward pass to get Logits
     # We use a subset of the sequence (e.g., first 32 tokens) to save RAM
-    T_sub = min(T, 32) 
-    logits = vae_model.decode_from_z(z[:, :T_sub, :]) 
+    #T_sub = min(T, 32) 
+    #logits = vae_model.decode_from_z(z[:, :T_sub, :]) 
     
     # 2. Compute Distortion G_mu
     # We use the 'Average Logit' as a scalar proxy for sensitivity 
