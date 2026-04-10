@@ -35,6 +35,9 @@ class ContinuousVAE(nn.Module):
         self.to_logits = nn.Linear(d_model, vocab_size)
 
     def encode(self, src_tokens):
+        # Safety: if a dict is passed, extract the tensor
+        if isinstance(src_tokens, dict):
+            src_tokens = src_tokens['input_ids']
         B, T = src_tokens.shape
         x = self.token_emb(src_tokens) * (self.d_model**0.5)
         x = x + self.pos_emb[:, :T, :]
