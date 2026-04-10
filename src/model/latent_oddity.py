@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def compute_stochastic_metric_optimized(vae_model, z, n_samples=5):
+def compute_stochastic_metric_optimized(vae_model, input_ids, n_samples=5):
     """
     Optimized for Colab: Computes the Metric Tensor G(z) using 
     Vector-Jacobian Products (VJP) to save memory.
