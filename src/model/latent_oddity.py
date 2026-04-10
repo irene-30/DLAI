@@ -25,7 +25,7 @@ def compute_stochastic_metric_optimized(vae_model, src_tokens, n_samples=5):
     
     # --- G_mu (Distortion) ---
     logits = vae_model.decode_from_z(z[:, :T_sub, :])
-    G = torch.zeros(B, T_sub, D, D, device=z.device)
+    G_mu = torch.zeros(B, T_sub, D, D, device=z.device)
 
     
     # Sample a few output dimensions to estimate the metric
@@ -47,7 +47,7 @@ def compute_stochastic_metric_optimized(vae_model, src_tokens, n_samples=5):
     # 3. Compute Uncertainty G_sigma
     # grad_sigma: how the predicted variance changes with respect to z
     sigma = torch.exp(0.5 * logvar[:, :T_sub, :])
-    #G_sigma = torch.zeros_like(G_mu)
+    G_sigma = torch.zeros_like(G_mu)
     
     for d in range(D):
         # This will now work because logvar -> sigma -> grad_s is a valid chain
@@ -78,14 +78,16 @@ class LatentOddityQuantizer(nn.Module):
         """
         # Step A: Compute the Metric Tensor (The Stochastic 'Oddity' term)
         # We call the optimized function here
-        G = compute_stochastic_metric_optimized(self.vae_model, z, logvar)
+        G = compute_stochastic_metric_optimized(self.vae_model, input_ids)
         
         # Step B: Compute Riemannian Distance
         # dist = (z - e)^T * G * (z - e)
         # Because z is (B, T, D) and G is (B, T, D, D), we process token-by-token
         B, T, D = z.shape
-        z_flat = z.view(-1, D)          # (B*T, D)
-        G_flat = G.view(-1, D, D)        # (B*T, D, D)
+        T_sub = G.size(1) 
+        z_sub = z[:, :T_sub, :]
+        z_flat = z_sub.reshape(-1, D)          # (B*T_sub, D)
+        G_flat = G.reshape(-1, D, D)           # (B*T_sub, D, D)
         embeddings = self.embedding.weight # (K, D)
 
         # Difference between every z token and every codebook entry
@@ -131,8 +133,8 @@ class LatentOddityQuantizer(nn.Module):
         # Flatten Batch and Time for distance matrix operations
         # z_flat: [B * T_sub, D]
         # G_flat: [B * T_sub, D, D]
-        z_flat = z_sub.reshape(-1, self.dim)
-        G_flat = G.reshape(-1, self.dim, self.dim)
+        z_flat = z_sub.reshape(-1, self.embedding_dim)
+        G_flat = G.reshape(-1, self.embedding_dim, self.embedding_dim)
     
         # 3. Compute Riemannian distance: d^2 = (z - e)^T G (z - e)
         # diff: [B*T_sub, num_embeddings, D]
