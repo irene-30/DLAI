@@ -88,7 +88,7 @@ class LatentOddityQuantizer(nn.Module):
         diff = z_flat.unsqueeze(1) - embeddings.unsqueeze(0)
         
         # Mahalanobis product: diff^T @ G @ diff
-        G_diff = torch.matmul(diff, G_flat.unsqueeze(1))
+        G_diff = torch.matmul(diff, G_flat)
         distances = torch.sum(G_diff * diff, dim=-1)
 
         # Step C: RBF Similarity
@@ -118,7 +118,7 @@ class LatentOddityQuantizer(nn.Module):
         # 3. Compute Riemannian distance: d^2 = (z - e)^T G (z - e)
         diff = z_flat.unsqueeze(1) - self.embedding.weight.unsqueeze(0)
     
-        G_diff = torch.matmul(diff, G_flat.unsqueeze(1)) 
+        G_diff = torch.matmul(diff, G_flat) 
         dist = torch.sum(G_diff * diff, dim=-1) 
     
         # 4. Find nearest codebook entries
