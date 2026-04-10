@@ -121,7 +121,7 @@ class LatentOddityQuantizer(nn.Module):
         """
         # 1. Compute the local metric tensor G(z) 
         # We pass input_ids to re-run the encoder inside to maintain the grad_fn
-        G = compute_stochastic_metric(self.vae_model, input_ids)
+        G = compute_stochastic_metric_optimized(self.vae_model, input_ids)
     
         # 2. Prepare tensors for Riemannian distance calculation
         # We subset to T=16 to keep the Jacobian memory footprint small for Colab T4
