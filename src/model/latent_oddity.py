@@ -3,19 +3,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def compute_stochastic_metric_optimized(vae_model, input_ids, n_samples=5):
+def compute_stochastic_metric_optimized(vae_model, src_tokens, n_samples=5):
     """
     Optimized for Colab: Computes the Metric Tensor G(z) using 
     Vector-Jacobian Products (VJP) to save memory.
     """
     # If 'batch' is the dictionary from the DataLoader:
-    if isinstance(batch, dict):
-        input_ids = batch['input_ids']
-    else:
-        input_ids = batch
+    #if isinstance(batch, dict):
+       #input_ids = batch['input_ids']
+   # else:
+        #input_ids = batch
     # 1. Re-run encoder to get mu/logvar with a fresh graph
     # We do NOT use torch.no_grad() here
-    mu, logvar = vae_model.encode(input_ids)
+    mu, logvar = vae_model.encode(src_tokens)
     
     # 2. Define z as a differentiable leaf node based on mu
     z = mu.detach().requires_grad_(True)
