@@ -8,30 +8,20 @@ def compute_stochastic_metric_optimized(vae_model, z, logvar, n_samples=10):
     Optimized for Colab: Computes the Metric Tensor G(z) using 
     Vector-Jacobian Products (VJP) to save memory.
     """
-    # 1. Ensure z tracks gradients for the Jacobian calculation
-    # Even if it was detached during encoding, we re-attach it here.
-    z = z.detach().requires_grad_(True) 
+    # 1. Re-run encoder to get mu/logvar with a fresh graph
+    # We do NOT use torch.no_grad() here
+    mu, logvar = vae_model.encode(input_ids)
+    
+    # 2. Define z as a differentiable leaf node based on mu
+    z = mu.detach().requires_grad_(True)
     
     B, T, D = z.shape
     T_sub = min(T, 16)
     
-    # 2. Proceed with the decoder pass
+    # --- G_mu (Distortion) ---
     logits = vae_model.decode_from_z(z[:, :T_sub, :])
+    G = torch.zeros(B, T_sub, D, D, device=z.device)
 
-
-    
-    # B, T, D = z.shape
-    #z = z.detach().requires_grad_(True)
-    
-    # 1. Forward pass to get Logits
-    # We use a subset of the sequence (e.g., first 32 tokens) to save RAM
-    #T_sub = min(T, 32) 
-    #logits = vae_model.decode_from_z(z[:, :T_sub, :]) 
-    
-    # 2. Compute Distortion G_mu
-    # We use the 'Average Logit' as a scalar proxy for sensitivity 
-    # to avoid the full [Output x Input] Jacobian matrix.
-    G_mu = torch.zeros(B, T_sub, D, D).to(z.device)
     
     # Sample a few output dimensions to estimate the metric
     # This is a 'Stochastic' approximation of the Stochastic Metric
@@ -52,10 +42,11 @@ def compute_stochastic_metric_optimized(vae_model, z, logvar, n_samples=10):
     # 3. Compute Uncertainty G_sigma
     # grad_sigma: how the predicted variance changes with respect to z
     sigma = torch.exp(0.5 * logvar[:, :T_sub, :])
-    G_sigma = torch.zeros_like(G_mu)
+    #G_sigma = torch.zeros_like(G_mu)
     
     for d in range(D):
-        grad_s = torch.autograd.grad(sigma[:, :, d].sum(), z, retain_graph=True)[0]
+        # This will now work because logvar -> sigma -> grad_s is a valid chain
+        grad_s = torch.autograd.grad(outputs = sigma[:, :, d].sum(), inputs = z, retain_graph=True)[0]
         grad_s = grad_s[:, :T_sub, :]
         G_sigma += torch.einsum('btd, btk -> btdk', grad_s, grad_s)
 
