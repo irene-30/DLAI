@@ -221,3 +221,98 @@ def create_assorted_dataset_rbf(
         assorted_samples.append({"text": prompt + assorted_cot + solution})
 
     return assorted_samples
+
+def create_assorted_dataset_oddity(
+    vae_model,
+    quantizer_model,
+    llm_tokenizer: PreTrainedTokenizer,
+    dataset: HFDataset,
+    device: torch.device,
+    compression_rate: int = 16
+) -> List[Dict[str, str]]:
+    """
+    Creates 'Token Assorted' dataset using Riemannian Quantization.
+    """
+    print("🚀 Creating Riemannian 'Latent Oddity' Assorted Dataset...")
+    vae_model.eval()
+    quantizer_model.eval() 
+    assorted_samples = []
+    boLatent, eoLatent = SPECIAL_TOKENS[1], SPECIAL_TOKENS[2]
+
+    for sample in tqdm(dataset):
+        parsed = parse_sample(sample)
+        if not parsed: continue
+        prompt, cot, solution = parsed
+
+        cot_tokens = llm_tokenizer(cot, add_special_tokens=False, return_tensors="pt", 
+                                   max_length=MAX_SEQ_LEN, truncation=True)['input_ids'].to(device)
+        
+        if cot_tokens.shape[1] == 0: continue
+        
+        # Latent Oddity: Use the Riemannian-aware quantization
+        with torch.no_grad():
+            # Get mu/logvar for the oddity update
+            mu, logvar, *_ = vae_model.encode(cot_tokens)
+            
+            # The Riemannian quantizer needs mu, logvar, and tokens to compute G(z)
+            # We call the get_indices method updated for Stage 2
+            indices = quantizer_model.get_indices(mu, logvar, input_ids=cot_tokens)
+        
+        indices = indices.squeeze(0)
+
+        # Assorted Replacement Logic
+        m_max = random.choice([0, 64, 128, 256])
+        m = random.choice(range(0, m_max + 1, compression_rate)) if m_max > 0 else 0
+        m = min(m, cot_tokens.shape[1])
+
+        if m > 0:
+            latent_strs = [LATENT_TOKENS[idx.item()] for idx in indices[:m]]
+            try:
+                # Map token index to character offset for clean splicing
+                encoding = llm_tokenizer(cot, add_special_tokens=False)
+                split_point = encoding.token_to_chars(m - 1).end
+                remaining_text = cot[split_point:]
+            except:
+                remaining_text = "" 
+            
+            assorted_cot = f"{boLatent} {' '.join(latent_strs)} {eoLatent}{remaining_text}"
+        else:
+            assorted_cot = cot
+
+        assorted_samples.append({"text": prompt + assorted_cot + solution})
+
+    return assorted_samples
+
+def parse_sample_oddity(sample: Dict) -> Optional[Tuple[str, str, str]]:
+    """
+    Enhanced parser for MetaMathQA and GSM8K.
+    Handles 'query/response' and 'question/answer' schemas.
+    """
+    if 'query' in sample and 'response' in sample:
+        question = sample['query']
+        answer_text = sample['response']
+    elif 'question' in sample and 'answer' in sample:
+        question = sample['question']
+        answer_text = sample['answer']
+    else:
+        return None
+
+    # MetaMath often uses "The answer is: n" or "The answer is #### n"
+    # We look for the most common mathematical delimiters
+    match = re.search(r'(####|[Tt]he answer is[:\s]*)\s*(-?\d+[\.,\d]*)', answer_text)
+    
+    if match:
+        final_answer_str = match.group(2).replace(',', '')
+        cot_text = answer_text[:match.start()].strip()
+    else:
+        # Fallback to the last numerical value in the string
+        numbers = re.findall(r'-?\d+[\.,\d]*', answer_text)
+        if numbers:
+            final_answer_str = numbers[-1].replace(',', '')
+            cot_text = answer_text.rstrip(final_answer_str).strip()
+            cot_text = re.sub(r'[Tt]he answer is[:\s]*$', '', cot_text).strip()
+        else:
+            return None
+
+    prompt = f"Question: {question}\nAnswer: "
+    return prompt, cot_text, f" #### {final_answer_str}"
