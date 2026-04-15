@@ -267,7 +267,7 @@ def create_assorted_dataset_oddity(
         # Il quantizzatore calcolerà G(z) internamente ricostruendo il grafo necessario
         indices = quantizer_model.get_indices(mu, input_ids=cot_tokens)
         
-        indices = indices.squeeze(0)
+        indices = indices.view(-1)
 
         # Assorted Replacement Logic
         m_max = random.choice([0, 64, 128, 256])
