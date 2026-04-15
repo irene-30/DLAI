@@ -249,14 +249,13 @@ def create_assorted_dataset_oddity(
         
         if cot_tokens.shape[1] == 0: continue
         
-        # Latent Oddity: Use the Riemannian-aware quantization
+        # 1. Troviamo mu e logvar con no_grad per risparmiare memoria base
         with torch.no_grad():
-            # Get mu/logvar for the oddity update
-            mu, logvar, *_ = vae_model.encode(cot_tokens)
+            mu, logvar = vae_model.encode(cot_tokens)
             
-            # The Riemannian quantizer needs mu, logvar, and tokens to compute G(z)
-            # We call the get_indices method updated for Stage 2
-            indices = quantizer_model.get_indices(mu, logvar, input_ids=cot_tokens)
+        # 2. ⚠️ CRITICO: Eseguiamo il quantizzatore FUORI dal no_grad!
+        # Il quantizzatore calcolerà G(z) internamente ricostruendo il grafo necessario
+        indices = quantizer_model.get_indices(mu, input_ids=cot_tokens)
         
         indices = indices.squeeze(0)
 
