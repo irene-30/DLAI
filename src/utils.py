@@ -12,6 +12,7 @@ from tqdm import tqdm
 import torch
 from datasets import Dataset as HFDataset
 from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoModelForCausalLM
 
 # --- Constants ---
 LLM_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct" 
