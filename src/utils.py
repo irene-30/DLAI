@@ -8,14 +8,14 @@ from typing import Dict, Tuple, List, Optional
 from tqdm import tqdm
 import torch
 from datasets import Dataset as HFDataset
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizer, AutoModelForCausalLM
 from src.model.vae import VQVAEModel # Import for type hinting and usage
 # Import models for type hinting
 from src.model.vae_continuous import ContinuousVAE
 from src.model.quantizer_posthoc import PostHocRBFQuantizer
 
 # --- Constants ---
-LLM_MODEL_NAME = "gpt2"
+LLM_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
 VQ_CODEBOOK_SIZE = 1024
 MAX_SEQ_LEN = 1024
 
