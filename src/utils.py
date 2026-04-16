@@ -45,6 +45,16 @@ def get_llm_tokenizer() -> PreTrainedTokenizer:
     })
     return tokenizer
 
+def get_llm_model(model_name: str = LLM_MODEL_NAME, vocab_size: Optional[int] = None):
+    """
+    Loads the causal language model. Resizes token embeddings if a new vocab_size is provided.
+    """
+    print(f"Loading LLM model: {model_name}")
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    if vocab_size is not None:
+        model.resize_token_embeddings(vocab_size)
+    return model
+
 def parse_gsm8k_sample(sample: Dict) -> Optional[Tuple[str, str, str]]:
     """
     Splits a GSM8K sample into Prompt (P), CoT (C), and Solution (S).
