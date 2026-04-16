@@ -1,3 +1,17 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+# Cruciale per operazioni geometriche avanzate e ottimizzazione su varietà
+# Se non disponibile, le funzioni di distanza devono essere implementate manualmente
+try:
+    import geoopt
+except ImportError:
+    geoopt = None
+
+# Per il calcolo di centroidi di Fréchet e stabilità numerica
+import math
+
 class HyperbolicPostHocQuantizer(nn.Module):
     def __init__(self, num_embeddings, embedding_dim, decay=0.99):
         super().__init__()
