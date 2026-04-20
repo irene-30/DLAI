@@ -8,8 +8,8 @@ from tqdm import tqdm
 
 from src.utils import (
     get_llm_tokenizer, 
-    #parse_gsm8k_sample, 
-    parse_sample,
+    parse_gsm8k_sample, 
+    #parse_sample,
     extract_final_answer,
     PATH_LLM_MODEL
 )
