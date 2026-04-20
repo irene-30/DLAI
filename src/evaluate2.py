@@ -48,7 +48,7 @@ def evaluate_model(model_path):
     total = 0
     
     for sample in tqdm(test_data, desc="Evaluating"):
-        parsed = parse_sample(sample)
+        parsed = parse_gsm8k_sample(sample)
         if not parsed:
             print(f"Skipping sample {i}: Failed to parse.")
             continue
