@@ -5,6 +5,7 @@ import torch
 from transformers import AutoModelForCausalLM
 from datasets import load_dataset
 from tqdm import tqdm
+import json
 
 from src.utils import (
     get_llm_tokenizer, 
@@ -18,10 +19,8 @@ from peft import PeftModel
 from transformers import AutoTokenizer
 
 def evaluate_model(model_path):
-    # 1. Load the original base model name (e.g., "meta-llama/Llama-3-8B")
-    # This must match LLM_MODEL_NAME from your training
+    # 1. Load the original base model name
     base_model_id = "meta-llama/Llama-3.2-3B-Instruct" 
-
 
     print(f"--- 📊 Evaluating Model from {model_path} ---")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -37,55 +36,58 @@ def evaluate_model(model_path):
     tokenizer = get_llm_tokenizer()
     base_model.resize_token_embeddings(len(tokenizer))
     
-    # 3. Load the LoRA adapter weights from your Drive path
+    # 3. Load the LoRA adapter weights
     print(f"Loading LoRA adapters from: {model_path}")
     model = PeftModel.from_pretrained(base_model, model_path)
-    
-    # 4. Merge if you want better inference speed (optional)
-    # model = model.merge_and_unload()
-    
     model.eval()
-    # 2. Load test data
+
+    # 4. Load test data
     test_data = load_dataset("gsm8k", "main")['test']
     print(f"Loaded {len(test_data)} test samples.")
+    
     correct = 0
     total = 0
     
-    for sample in tqdm(test_data, desc="Evaluating"):
+    # --- FIX 1: Assign tqdm to 'pbar' ---
+    # We use enumerate(pbar) so we have an index 'i' for our print statements
+    pbar = tqdm(test_data, desc="Evaluating")
+    
+    for i, sample in enumerate(pbar):
         parsed = parse_gsm8k_sample(sample)
         if not parsed:
-            print(f"Skipping sample {i}: Failed to parse.")
+            # Use pbar.write to avoid breaking the progress bar
+            pbar.write(f"Skipping sample {i}: Failed to parse.")
             continue
         
-        #prompt, _, solution = parsed
         prompt = parsed['prompt']
         solution = parsed['solution']
         
         # Get ground truth answer
         true_answer = extract_final_answer(solution)
         if true_answer is None:
-            print(f"Skipping sample {i}: Failed to extract true answer.")
+            pbar.write(f"Skipping sample {i}: Failed to extract true answer.")
             continue
             
-        # 3. Generate response
+        # 5. Generate response
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
         with torch.no_grad():
             output = model.generate(
                 **inputs,
-                max_new_tokens=256, # Allow space for reasoning
+                max_new_tokens=256,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id
             )
         
         generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
         
-        # 4. Check for correctness
+        # 6. Check for correctness
         pred_answer = extract_final_answer(generated_text)
         
         if pred_answer is not None and pred_answer == true_answer:
             correct += 1
         total += 1
-     # 5. LIVE UPDATE: Update the bar with current accuracy
+
+        # --- FIX 2: pbar now exists in this scope ---
         current_acc = (correct / total) * 100 if total > 0 else 0
         pbar.set_postfix({
             "acc": f"{current_acc:.2f}%", 
@@ -93,13 +95,21 @@ def evaluate_model(model_path):
             "total": total
         })
 
-    # 6. Final Report
+    # 7. Final Report
     accuracy = (correct / total) * 100 if total > 0 else 0
     print("\n--- 📈 Evaluation Results ---")
     print(f"Correct: {correct}")
     print(f"Total:   {total}")
     print(f"Accuracy: {accuracy:.2f}%")
-    print("-------------------------------")
+    
+    results = {
+        "accuracy": accuracy,
+        "correct": correct,
+        "total": total
+    }
 
-if __name__ == "__main__":
-    evaluate_model()
+    # 8. Save to Drive
+    save_file = "/content/drive/MyDrive/DLAI/experiments/llm_latent_oddity_finetune/final_model/eval_results.json"
+    with open(save_file, "w") as f:
+        json.dump(results, f, indent=4)
+    print(f"✅ Results saved to {save_file}")
