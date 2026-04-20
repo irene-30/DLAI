@@ -1,5 +1,21 @@
+"""
+Evaluates the fine-tuned LLM (Stage 2) on the GSM8K test set.
+"""
+import torch
+from transformers import AutoModelForCausalLM
+from datasets import load_dataset
+from tqdm import tqdm
+
+from src.utils import (
+    get_llm_tokenizer, 
+    #parse_gsm8k_sample, 
+    parse_sample,
+    extract_final_answer,
+    PATH_LLM_MODEL
+)
+
 from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer
 
 def evaluate_model(model_path):
     # 1. Load the original base model name (e.g., "meta-llama/Llama-3-8B")
