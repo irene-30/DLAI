@@ -68,6 +68,26 @@ def get_llm_model(model_name: str = LLM_MODEL_NAME, vocab_size: Optional[int] = 
         model.resize_token_embeddings(vocab_size)
     return model
 
+def parse_gsm8k_sample(sample: Dict) -> Optional[Tuple[str, str, str]]:
+    """
+    Splits a GSM8K sample into Prompt (P), CoT (C), and Solution (S).
+    """
+    question = sample.get('question', '')
+    answer_text = sample.get('answer', '')
+    
+    match = re.search(r'####\s*(-?\d+[\.,\d]*)', answer_text)
+    if not match:
+        return None # Skip samples we can't parse
+
+    final_answer_str = match.group(1).replace(',', '')
+    cot_text = answer_text.split('####')[0].strip()
+    
+    prompt = f"Question: {question}\nAnswer: "
+    cot = cot_text
+    solution = f" #### {final_answer_str}"
+    
+    return {'prompt': prompt, 'cot':  cot, 'solution': solution}
+
 def parse_sample(sample: Dict) -> Optional[Tuple[str, str, str]]:
     """
     Robust parser for GSM8K and MetaMathQA.
