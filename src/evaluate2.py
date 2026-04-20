@@ -20,7 +20,7 @@ from transformers import AutoTokenizer
 def evaluate_model(model_path):
     # 1. Load the original base model name (e.g., "meta-llama/Llama-3-8B")
     # This must match LLM_MODEL_NAME from your training
-    base_model_id = "YOUR_BASE_MODEL_NAME_HERE" 
+    base_model_id = "meta-llama/Llama-3.2-3B-Instruct" 
     
     print(f"Loading Base Model: {base_model_id}")
     base_model = AutoModelForCausalLM.from_pretrained(
