@@ -32,7 +32,7 @@ from src.utils import (
 
 def evaluate_model(model_path):
     # --- 1. Setup Paths & Device ---
-    save_dir = "/content/drive/MyDrive/DLAI/experiments/llm_latent_oddity_finetune/evaluation/"
+    save_dir = "/content/drive/MyDrive/DLAI/experiments/llm_latent_oddity_finetune/evaluate/"
     primary_file = os.path.join(save_dir, "eval_results.json")
     backup_file = os.path.join(save_dir, "eval_results_backup.json")
     base_model_id = "meta-llama/Llama-3.2-3B-Instruct" 
