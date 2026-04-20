@@ -72,11 +72,16 @@ def evaluate_model(model_path: str = PATH_LLM_MODEL):
         if pred_answer is not None and pred_answer == true_answer:
             correct += 1
         total += 1
-        print(total)
+       # 5. LIVE UPDATE: Update the bar with current accuracy
+        current_acc = (correct / total) * 100 if total > 0 else 0
+        pbar.set_postfix({
+            "acc": f"{current_acc:.2f}%", 
+            "correct": correct,
+            "total": total
+        })
 
-    # 5. Report accuracy
-    print(total)
-    accuracy = (correct / total) * 100
+    # 6. Final Report
+    accuracy = (correct / total) * 100 if total > 0 else 0
     print("\n--- 📈 Evaluation Results ---")
     print(f"Correct: {correct}")
     print(f"Total:   {total}")
