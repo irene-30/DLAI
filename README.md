@@ -1,4 +1,4 @@
-# Interpretable Math Reasoning: Standard VQ-VAE vs. Riemannian Latent Space Oddity
+# POST-HOC VAE QUANTIZATION VIA STOCHASTIC RIEMANNIAN METRICS FOR TOKEN ASSORTED COT PROMPTING
 
 This project implements an advanced mathematical reasoning pipeline for Large Language Models (LLMs), comparing the effectiveness of different latent space representations in supporting complex cognitive processes. The work is inspired by the combination of textual **Chain-of-Thought (CoT)** techniques and discrete latent abstractions.
 
@@ -30,11 +30,21 @@ By integrating a **Radial Basis Function (RBF) network** to model precision (inv
 
 ## Requirements and Setup
 
-### Hugging Face Permissions
-The project requires access to gated models and datasets. You must:
-1.  **Request access to Llama-3.2-3B-Instruct** on the official Meta Hugging Face page.
-2.  **Accept the terms for MetaMathQA** if required by the dataset repository.
-3.  **Configure an HF_TOKEN** in your environment (Colab Secrets) to authenticate.
+### Hugging Face Permissions & Access
+This project uses the **Llama-3.2-3B-Instruct** model, which requires explicit permission from Meta to be accessed via Hugging Face.
+
+1.  **Request Access to Llama 3.2**:
+    * Log in to your [Hugging Face](https://huggingface.co/) account.
+    * Visit the [Meta Llama 3.2 3B Instruct](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct) model page.
+    * Accept the license terms. Approval is typically granted within minutes.
+2.  **Generate an Access Token**:
+    * Go to your Hugging Face **Settings** -> **Access Tokens**.
+    * Click **New Token**, name it `DLAI-Project`, and set the type to **Read**.
+    * Copy the token.
+3.  **Using the Token in Google Colab**:
+    * On the left sidebar in Colab, click the 🔑 (**Secrets**) icon.
+    * Add a new secret named `HF_TOKEN` and paste your token as the value.
+    * Enable the **"Notebook access"** toggle.
 
 ### Hardware and Optimizations
 Optimized for **NVIDIA T4 GPUs (16GB VRAM)** using:
