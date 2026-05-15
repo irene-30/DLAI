@@ -59,6 +59,7 @@ To ensure full reproducibility and correct dependency management, **the first ce
 3.  **Notebook 3 (Data Processing)**: Encoding MetaMathQA into hybrid text-latent sequences.
 4.  **Notebook 4 (LLM Fine-Tuning)**: Training Llama-3.2-3B using LoRA to output custom `<latent_N>` tokens.
 5.  **Notebook 5 (Evaluation & Interpretation)**: Quantitative benchmarking on GSM8K and decoding of "latent thoughts" into human-readable text.
+
 For Notebooks 2,3,4,5 there are two versions: one with a standard VQVAE, and the other using the *"Latent Space Oddity"* pipeline. 
   
 ## References
