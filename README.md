@@ -42,9 +42,25 @@ Optimized for **NVIDIA T4 GPUs (16GB VRAM)** using:
 * **8-bit Paged AdamW**: Reducing the memory load of optimizer states.
 * **Gradient Checkpointing**: Critical VRAM saving during training.
 
-### Installation
-The project uses `uv` for fast dependency management as defined in the `pyproject.toml` file.
-```bash
-git clone <repository-url>
-cd <folder-name>
-pip install .
+## Installation & Execution
+This project is designed to be run **exclusively on Google Colab**. 
+
+To ensure full reproducibility and correct dependency management, **the first cell of every notebook must be executed**. This setup cell automates the entire process:
+* **Google Drive**: Mounts your Drive for persistent storage of models and data.
+* **Environment**: Installs the `uv` package manager for high-speed dependency resolution.
+* **Repository**: Clones the `llama` branch of the repository.
+* **Dependencies**: Reads the `pyproject.toml` file and installs all necessary requirements automatically.
+
+*You do not need to manually install libraries via the terminal; the first cell handles the entire environment configuration.*
+
+## Project Structure
+1.  **Notebook 1 (Data Exploration & Setup)**: Environment configuration and initial analysis of the MetaMathQA dataset.
+2.  **Notebook 2 (VAE Training)**: Training the representation backbone (Standard VQ-VAE or Continuous VAE + RBF).
+3.  **Notebook 3 (Data Processing)**: Encoding MetaMathQA into hybrid text-latent sequences.
+4.  **Notebook 4 (LLM Fine-Tuning)**: Training Llama-3.2-3B using LoRA to output custom `<latent_N>` tokens.
+5.  **Notebook 5 (Evaluation & Interpretation)**: Quantitative benchmarking on GSM8K and decoding of "latent thoughts" into human-readable text.
+For Notebooks 2,3,4,5 there are two versions: one with a standard VQVAE, and the other using the *"Latent Space Oddity"* pipeline. 
+  
+## References
+* Su, D., et al. (2025). *Token Assorted: Mixing Latent and Text Tokens for Improved Language Model Reasoning*.
+* Arvanitidis, G., et al. (2018). *Latent Space Oddity: On the Curvature of Deep Generative Models*.
