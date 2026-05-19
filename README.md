@@ -70,7 +70,7 @@ To ensure full reproducibility and correct dependency management, **the first ce
 4.  **Notebook 4 (LLM Fine-Tuning)**: Training Llama-3.2-3B using LoRA to output custom `<latent_N>` tokens.
 5.  **Notebook 5 (Evaluation & Interpretation)**: Quantitative benchmarking on GSM8K and decoding of "latent thoughts" into human-readable text.
 
-For Notebooks 2,3,4,5 there are two versions: one with a standard VQVAE, and the other using the *"Latent Space Oddity"* pipeline. 
+For Notebooks 2,3,4,5 there are two versions: one with a standard VQVAE, and the other using the *"Latent Space Oddity"* pipeline. (You will also find the notebooks where the model gpt2 was trained on GSM8K, as mentioned in the appendix, but they are not to be run).
   
 ## References
 * Su, D., et al. (2025). *Token Assorted: Mixing Latent and Text Tokens for Improved Language Model Reasoning*.
