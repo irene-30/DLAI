@@ -1,4 +1,4 @@
-# POST-HOC VAE QUANTIZATION VIA STOCHASTIC RIEMANNIAN METRICS FOR TOKEN ASSORTED COT PROMPTING
+# POST-HOC VAE QUANTIZATION VIA STOCHASTIC RIEMANNIAN METRIC FOR TOKEN ASSORTED COT PROMPTING
 
 This project implements an advanced mathematical reasoning pipeline for Large Language Models (LLMs), comparing the effectiveness of different latent space representations in supporting complex cognitive processes. The work is inspired by the combination of textual **Chain-of-Thought (CoT)** techniques and discrete latent abstractions.
 
