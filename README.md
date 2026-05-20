@@ -75,3 +75,5 @@ For Notebooks 2,3,4,5 there are two versions: one with a standard VQVAE, and the
 ## References
 * Su, D., et al. (2025). *Token Assorted: Mixing Latent and Text Tokens for Improved Language Model Reasoning*.
 * Arvanitidis, G., et al. (2018). *Latent Space Oddity: On the Curvature of Deep Generative Models*.
+* van den Oord, A., et al. (2017). *Neural Discrete Representation Learning*.
+* Yang, T., et al. (2018). *Geodesic Clustering in Deep Generative Models*.
